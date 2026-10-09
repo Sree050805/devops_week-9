@@ -2,30 +2,49 @@
 pipeline {
     agent any
 
+    environment {
+        PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${env.PATH}"
+        KUBECONFIG = "/Users/sreejanadgoud/.kube/config"
+    }
+
     stages {
         stage('Build Docker Image') {
             steps {
-                echo "Build Docker Image"
-                bat "docker build -t kubdemoapp:v1 ."
+                echo 'Build Docker Image'
+                sh 'docker build -t myfirstpythonapp:regevent .'
             }
         }
+
         stage('Docker Login') {
             steps {
-                bat 'docker login -u bhavani765 -p bhanu@123'
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_TOKEN'
+                )]) {
+                    sh '''
+                        echo "$DOCKER_TOKEN" | docker login \
+                          -u "$DOCKER_USER" --password-stdin
+                    '''
+                }
             }
         }
-        stage('push Docker Image to Docker Hub') {
+
+        stage('Push Docker Image to Docker Hub') {
             steps {
-                echo "push Docker Image to Docker Hub"
-                bat "docker tag kubdemoapp:v1 bhavani765/sample:kubeimage1"
-                bat "docker push bhavani765/sample:kubeimage1"
+                echo 'Push Docker Image to Docker Hub'
+                sh 'docker tag myfirstpythonapp:regevent sreeja6/devops_week9:regevent'
+                sh 'docker push sreeja6/devops_week9:regevent'
             }
         }
+
         stage('Deploy to Kubernetes') {
             steps {
-                // apply deployment & service
-                bat 'kubectl apply -f deployment.yaml --validate=false'
-                bat 'kubectl apply -f service.yaml'
+                echo 'Deploy to Kubernetes'
+                sh 'kubectl apply -f deployment.yaml'
+                sh 'kubectl apply -f service.yaml'
+                sh 'kubectl rollout restart deployment/kubedemoapp-deployment'
+                sh 'kubectl rollout status deployment/kubedemoapp-deployment --timeout=180s'
             }
         }
     }
